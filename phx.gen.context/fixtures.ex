@@ -1,6 +1,9 @@
 <%= for {attr, {_function_name, function_def, _needs_impl?}} <- schema.fixture_unique_functions do %>@doc
 <%= function_def %>
-<% end %>  @spec <%= schema.singular %>_fixture(map()) :: <%= inspect schema.module %>.t()
+<% end %>  @type params :: map()
+  @type <%= schema.singular %> :: <%= inspect schema.module %>.t()
+
+  @spec <%= schema.singular %>_fixture(params()) :: <%= schema.singular %>()
   def <%= schema.singular %>_fixture(attrs \\ %{}) do
     {:ok, <%= schema.singular %>} =
       attrs
