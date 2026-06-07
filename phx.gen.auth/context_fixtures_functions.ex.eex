@@ -1,0 +1,100 @@
+  import Ecto.Query
+
+  alias <%= inspect context.module %>
+  alias <%= inspect scope_config.scope.module %>
+  alias <%= inspect context.module %>.<%= inspect schema.alias %>
+  alias <%= inspect context.module %>.<%= inspect schema.alias %>Token
+  alias <%= inspect schema.repo %><%= schema.repo_alias %>
+
+  @type count :: integer()
+  @type params :: map()
+  @type scope :: <%= inspect scope_config.scope.alias %>.t()
+  @type status :: atom()
+  @type str :: binary()
+  @type user :: <%= inspect schema.alias %>.t()
+
+  @spec unique_<%= schema.singular %>_email() :: str()
+  def unique_<%= schema.singular %>_email, do: "<%= schema.singular %>#{System.unique_integer()}@example.com"
+
+  @spec valid_<%= schema.singular %>_password() :: str()
+  def valid_<%= schema.singular %>_password, do: "hello world!"
+
+  @spec valid_<%= schema.singular %>_attributes(params()) :: params()
+  def valid_<%= schema.singular %>_attributes(attrs \\ %{}) do
+    Enum.into(attrs, %{
+      email: unique_<%= schema.singular %>_email()
+    })
+  end
+
+  @spec unconfirmed_<%= schema.singular %>_fixture(params()) :: user()
+  def unconfirmed_<%= schema.singular %>_fixture(attrs \\ %{}) do
+    {:ok, <%= schema.singular %>} =
+      attrs
+      |> valid_<%= schema.singular %>_attributes()
+      |> <%= inspect context.alias %>.register_<%= schema.singular %>()
+
+    <%= schema.singular %>
+  end
+
+  @spec <%= schema.singular %>_fixture(params()) :: user()
+  def <%= schema.singular %>_fixture(attrs \\ %{}) do
+    unconfirmed = unconfirmed_<%= schema.singular %>_fixture(attrs)
+
+    token =
+      extract_<%= schema.singular %>_token(fn url ->
+        <%= inspect context.alias %>.deliver_login_instructions(unconfirmed, url)
+      end)
+
+    {:ok, {<%= schema.singular %>, _expired_tokens}} =
+      <%= inspect context.alias %>.login_<%= schema.singular %>_by_magic_link(token)
+
+    <%= schema.singular %>
+  end
+
+  @spec <%= schema.singular %>_scope_fixture() :: scope()
+  def <%= schema.singular %>_scope_fixture do
+    <%= schema.singular %> = <%= schema.singular %>_fixture()
+    <%= schema.singular %>_scope_fixture(<%= schema.singular %>)
+  end
+
+  @spec <%= schema.singular %>_scope_fixture(user()) :: scope()
+  def <%= schema.singular %>_scope_fixture(<%= schema.singular %>) do
+    <%= inspect scope_config.scope.alias %>.for_<%= schema.singular %>(<%= schema.singular %>)
+  end
+
+  @spec set_password(user()) :: user()
+  def set_password(<%= schema.singular %>) do
+    {:ok, {updated_<%= schema.singular %>, _expired_tokens}} =
+      <%= inspect context.alias %>.update_<%= schema.singular %>_password(<%= schema.singular %>, %{password: valid_<%= schema.singular %>_password()})
+
+    updated_<%= schema.singular %>
+  end
+
+  @spec extract_<%= schema.singular %>_token((str() -> term())) :: str()
+  def extract_<%= schema.singular %>_token(fun) do
+    {:ok, captured_email} = fun.(&"[TOKEN]#{&1}[TOKEN]")
+    [_before, token | _rest] = String.split(captured_email.text_body, "[TOKEN]")
+    token
+  end
+
+  @spec override_token_authenticated_at(str(), term()) :: {count(), nil}
+  def override_token_authenticated_at(token, authenticated_at) when is_binary(token) do
+    query = from(t in <%= inspect schema.alias %>Token, where: t.token == ^token)
+    Repo.update_all(query, set: [authenticated_at: authenticated_at])
+  end
+
+  @spec generate_<%= schema.singular %>_magic_link_token(user()) :: {str(), str()}
+  def generate_<%= schema.singular %>_magic_link_token(<%= schema.singular %>) do
+    {encoded_token, <%= schema.singular %>_token} = <%= inspect schema.alias %>Token.build_email_token(<%= schema.singular %>, "login")
+    Repo.insert!(<%= schema.singular %>_token)
+    {encoded_token, <%= schema.singular %>_token.token}
+  end
+
+  @spec offset_<%= schema.singular %>_token(str(), count(), status()) :: {count(), nil}
+  def offset_<%= schema.singular %>_token(token, amount_to_add, unit) do
+    now = <%= datetime_now %>
+    dt = <%= inspect datetime_module %>.add(now, amount_to_add, unit)
+
+    query = from(ut in <%= inspect schema.alias %>Token, where: ut.token == ^token)
+    Repo.update_all(query, set: [inserted_at: dt, authenticated_at: dt])
+  end
